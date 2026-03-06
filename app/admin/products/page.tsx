@@ -57,6 +57,21 @@ export default function ProductsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+
+  const uploadToCloudinary = async (file: File): Promise<string> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('upload_preset', 'nessaluxe');
+    const res = await fetch('https://api.cloudinary.com/v1_1/dtkoahwkc/image/upload', {
+      method: 'POST',
+      body: fd,
+    });
+    const data = await res.json();
+    if (!data.secure_url) throw new Error('Upload failed');
+    return data.secure_url;
+  };
 
   const notify = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -82,33 +97,51 @@ export default function ProductsPage() {
     apiFetch('/categories?limit=100').then(r => r.json()).then(d => setCategories(d.data ?? []));
   }, []);
 
-  const openAdd = () => { setEditingId(null); setForm(EMPTY_FORM); setModalOpen(true); };
+  const openAdd = () => {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setImageFile(null);
+    setImagePreview('');
+    setModalOpen(true);
+  };
   const openEdit = (p: Product) => {
     setEditingId(p.id);
+    const existingUrl = p.images?.find(i => i.isPrimary)?.imageUrl ?? p.images?.[0]?.imageUrl ?? '';
     setForm({
       name: p.name, description: p.description ?? '', price: p.price,
       stock: String(p.stock), categoryId: p.categoryId ? String(p.categoryId) : '',
-      imageUrl: p.images?.find(i => i.isPrimary)?.imageUrl ?? p.images?.[0]?.imageUrl ?? '',
+      imageUrl: existingUrl,
     });
+    setImageFile(null);
+    setImagePreview(existingUrl);
     setModalOpen(true);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    const body: Record<string, unknown> = {
-      name: form.name, description: form.description,
-      price: parseFloat(form.price), stock: parseInt(form.stock),
-      category_id: parseInt(form.categoryId),
-    };
-    if (form.imageUrl) body.images = [{ imageUrl: form.imageUrl, isPrimary: true }];
-    const res = await apiFetch(
-      editingId ? `/admin/products/${editingId}` : '/admin/products',
-      { method: editingId ? 'PUT' : 'POST', body: JSON.stringify(body) }
-    );
-    setSaving(false);
-    if (res.ok) { notify(editingId ? 'Product updated!' : 'Product created!'); setModalOpen(false); fetchProducts(); }
-    else { const err = await res.json(); notify(err.error || 'Failed to save', false); }
+    try {
+      let imageUrl = form.imageUrl;
+      if (imageFile) {
+        imageUrl = await uploadToCloudinary(imageFile);
+      }
+      const body: Record<string, unknown> = {
+        name: form.name, description: form.description,
+        price: parseFloat(form.price), stock: parseInt(form.stock),
+        category_id: parseInt(form.categoryId),
+      };
+      if (imageUrl) body.images = [{ imageUrl, isPrimary: true }];
+      const res = await apiFetch(
+        editingId ? `/admin/products/${editingId}` : '/admin/products',
+        { method: editingId ? 'PUT' : 'POST', body: JSON.stringify(body) }
+      );
+      if (res.ok) { notify(editingId ? 'Product updated!' : 'Product created!'); setModalOpen(false); fetchProducts(); }
+      else { const err = await res.json(); notify(err.error || 'Failed to save', false); }
+    } catch {
+      notify('Image upload failed', false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (id: number) => {
@@ -277,8 +310,48 @@ export default function ProductsPage() {
                 </select>
               </div>
               <div>
-                <label className={labelCls}>Image URL</label>
-                <input type="url" value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} className={inputCls} placeholder="https://example.com/image.jpg" />
+                <label className={labelCls}>Product Image</label>
+                <div className="space-y-3">
+                  {/* Preview */}
+                  {(imagePreview || form.imageUrl) && (
+                    <div className="relative w-full h-40 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={imagePreview || form.imageUrl}
+                        alt="Preview"
+                        className="w-full h-full object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setImageFile(null); setImagePreview(''); setForm(f => ({ ...f, imageUrl: '' })); }}
+                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white shadow border border-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                  {/* File picker */}
+                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 hover:border-indigo-300 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-gray-400 mb-1" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                    <span className="text-xs text-gray-400">{imageFile ? imageFile.name : 'Click to upload image'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setImageFile(file);
+                        setImagePreview(URL.createObjectURL(file));
+                        setForm(f => ({ ...f, imageUrl: '' }));
+                      }}
+                    />
+                  </label>
+                </div>
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-60 transition-all shadow-lg shadow-indigo-600/20">
