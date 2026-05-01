@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { apiFetch } from '../../../lib/api';
+import { useEffect, useState } from 'react';
+import { listOrders, updateOrderStatus } from '../../../lib/admin-data';
 import { Order, Pagination } from '../../../lib/types';
 
 const STATUS_OPTIONS = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
@@ -41,22 +41,41 @@ export default function OrdersPage() {
 
   const notify = (msg: string, ok = true) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 4000); };
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch(`/admin/orders?page=${page}&limit=15`);
-      const data = await res.json();
-      setOrders(data.data ?? []);
-      setPagination(data.pagination ?? null);
-    } finally { setLoading(false); }
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadOrders() {
+      setLoading(true);
+      try {
+        const result = await listOrders({ page, limit: 15 });
+        if (!cancelled) {
+          setOrders(result.data);
+          setPagination(result.pagination);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadOrders();
+
+    return () => {
+      cancelled = true;
+    };
   }, [page]);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
-
-  const updateStatus = async (id: number, status: string) => {
-    const res = await apiFetch(`/admin/orders/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
-    if (res.ok) { notify('Status updated!'); fetchOrders(); }
-    else notify('Failed to update status', false);
+  const changeStatus = async (id: number, status: string) => {
+    try {
+      await updateOrderStatus(id, status);
+      notify('Status updated!');
+      const result = await listOrders({ page, limit: 15 });
+      setOrders(result.data);
+      setPagination(result.pagination);
+    } catch {
+      notify('Failed to update status', false);
+    }
   };
 
   return (
@@ -121,7 +140,7 @@ export default function OrdersPage() {
                   <td className="px-6 py-4">
                     <select
                       value={o.status}
-                      onChange={(e) => updateStatus(o.id, e.target.value)}
+                      onChange={(e) => changeStatus(o.id, e.target.value)}
                       className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer"
                     >
                       {STATUS_OPTIONS.map(s => (

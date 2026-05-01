@@ -1,7 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { apiFetch } from '../../../lib/api';
+import { useEffect, useState } from 'react';
+import {
+  deleteProduct,
+  listCategories,
+  listProducts,
+  saveProduct,
+} from '../../../lib/admin-data';
 import { Product, Category, Pagination } from '../../../lib/types';
 
 const EMPTY_FORM = { name: '', description: '', price: '', stock: '', categoryId: '', imageUrl: '' };
@@ -78,24 +83,35 @@ export default function ProductsPage() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  const fetchProducts = useCallback(async () => {
-    setLoading(true);
-    const params = new URLSearchParams({ page: String(page), limit: '10' });
-    if (search) params.set('search', search);
-    try {
-      const res = await apiFetch(`/products?${params}`);
-      const data = await res.json();
-      setProducts(data.data ?? []);
-      setPagination(data.pagination ?? null);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search]);
-
-  useEffect(() => { fetchProducts(); }, [fetchProducts]);
   useEffect(() => {
-    apiFetch('/categories?limit=100').then(r => r.json()).then(d => setCategories(d.data ?? []));
-  }, []);
+    let cancelled = false;
+
+    async function loadPage() {
+      setLoading(true);
+      try {
+        const [productsResult, categoriesResult] = await Promise.all([
+          listProducts({ page, limit: 10, search }),
+          listCategories(),
+        ]);
+
+        if (cancelled) return;
+
+        setProducts(productsResult.data);
+        setPagination(productsResult.pagination);
+        setCategories(categoriesResult);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadPage();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [page, search]);
 
   const openAdd = () => {
     setEditingId(null);
@@ -125,20 +141,22 @@ export default function ProductsPage() {
       if (imageFile) {
         imageUrl = await uploadToCloudinary(imageFile);
       }
-      const body: Record<string, unknown> = {
-        name: form.name, description: form.description,
-        price: parseFloat(form.price), stock: parseInt(form.stock),
-        category_id: parseInt(form.categoryId),
-      };
-      if (imageUrl) body.images = [{ imageUrl, isPrimary: true }];
-      const res = await apiFetch(
-        editingId ? `/admin/products/${editingId}` : '/admin/products',
-        { method: editingId ? 'PUT' : 'POST', body: JSON.stringify(body) }
-      );
-      if (res.ok) { notify(editingId ? 'Product updated!' : 'Product created!'); setModalOpen(false); fetchProducts(); }
-      else { const err = await res.json(); notify(err.error || 'Failed to save', false); }
+      await saveProduct({
+        id: editingId ?? undefined,
+        name: form.name,
+        description: form.description,
+        price: parseFloat(form.price),
+        stock: parseInt(form.stock),
+        categoryId: parseInt(form.categoryId),
+        imageUrl,
+      });
+      notify(editingId ? 'Product updated!' : 'Product created!');
+      setModalOpen(false);
+      const result = await listProducts({ page, limit: 10, search });
+      setProducts(result.data);
+      setPagination(result.pagination);
     } catch {
-      notify('Image upload failed', false);
+      notify('Failed to save product', false);
     } finally {
       setSaving(false);
     }
@@ -146,9 +164,15 @@ export default function ProductsPage() {
 
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this product?')) return;
-    const res = await apiFetch(`/admin/products/${id}`, { method: 'DELETE' });
-    if (res.ok) { notify('Product deleted!'); fetchProducts(); }
-    else notify('Failed to delete', false);
+    try {
+      await deleteProduct(id);
+      notify('Product deleted!');
+      const result = await listProducts({ page, limit: 10, search });
+      setProducts(result.data);
+      setPagination(result.pagination);
+    } catch {
+      notify('Failed to delete', false);
+    }
   };
 
   return (
@@ -182,7 +206,7 @@ export default function ProductsPage() {
             placeholder="Search products..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { setPage(1); fetchProducts(); } }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { setPage(1); } }}
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           />
         </div>

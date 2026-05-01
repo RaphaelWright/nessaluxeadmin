@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { apiFetch } from '../../../lib/api';
+import { getAnalytics } from '../../../lib/admin-data';
 import { Analytics } from '../../../lib/types';
 
 interface Trends {
@@ -24,13 +24,31 @@ export default function AnalyticsPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([
-      apiFetch('/admin/analytics/overview').then(r => r.json()),
-      apiFetch('/admin/analytics/trends?days=30').then(r => r.json()),
-    ])
-      .then(([overview, trendsData]) => { setAnalytics(overview); setTrends(trendsData); })
-      .catch(() => setError('Failed to load analytics'))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+
+    async function loadAnalytics() {
+      try {
+        const result = await getAnalytics(30);
+        if (!cancelled) {
+          setAnalytics(result.analytics);
+          setTrends(result.trends);
+        }
+      } catch {
+        if (!cancelled) {
+          setError('Failed to load analytics');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadAnalytics();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const trendEntries = trends
