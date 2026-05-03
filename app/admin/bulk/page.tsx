@@ -1,9 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { apiFetch, getToken } from '../../../lib/api';
-
-const API_BASE = 'https://newcommerce-production.up.railway.app/api';
+import { exportProductsCsv, importProducts } from '../../../lib/admin-data';
 
 function Toast({ msg, ok, onClose }: { msg: string; ok: boolean; onClose: () => void }) {
   return (
@@ -34,12 +32,7 @@ export default function BulkPage() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const token = getToken();
-      const res = await fetch(`${API_BASE}/admin/bulk/export-products`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) { notify('Export failed', false); return; }
-      const blob = await res.blob();
+      const blob = await exportProductsCsv();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = 'products.csv'; a.click();
@@ -59,13 +52,9 @@ export default function BulkPage() {
 
     setImporting(true);
     try {
-      const res = await apiFetch('/admin/bulk/import-products', {
-        method: 'POST',
-        body: JSON.stringify({ products }),
-      });
-      const data = await res.json();
-      if (res.ok) { notify(data.message || `${data.count} products imported!`); setImportJson(''); }
-      else notify(data.error || 'Import failed', false);
+      const count = await importProducts(products);
+      notify(`${count} products imported!`);
+      setImportJson('');
     } catch { notify('Import failed', false); }
     finally { setImporting(false); }
   };
