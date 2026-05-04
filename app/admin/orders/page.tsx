@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { listOrders, updateOrderStatus } from '../../../lib/admin-data';
 import { Order, Pagination } from '../../../lib/types';
+import { formatCurrency } from '../../../lib/currency';
 
 const STATUS_OPTIONS = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
 
@@ -127,7 +128,7 @@ export default function OrdersPage() {
                     <p className="text-xs text-gray-400">{o.user?.email}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-sm font-bold text-gray-900">${o.totalAmount}</span>
+                    <span className="text-sm font-bold text-gray-900">{formatCurrency(o.totalAmount)}</span>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full ring-1 ring-inset capitalize ${STATUS_STYLES[o.status] ?? 'bg-gray-50 text-gray-700 ring-gray-600/20'}`}>

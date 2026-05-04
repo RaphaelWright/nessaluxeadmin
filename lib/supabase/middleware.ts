@@ -7,7 +7,8 @@ function isAdminPath(pathname: string): boolean {
 }
 
 function isAdminUser(user: { app_metadata?: Record<string, unknown> } | null) {
-  return user?.app_metadata?.role === "admin";
+  const role = user?.app_metadata?.role;
+  return role === "admin" || role === "superadmin";
 }
 
 export async function updateSession(request: NextRequest) {

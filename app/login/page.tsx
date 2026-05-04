@@ -29,11 +29,15 @@ export default function LoginPage() {
         return;
       }
 
-      if (authData.user?.app_metadata?.role !== 'admin') {
+      const role = authData.user?.app_metadata?.role;
+      const isAllowed = role === 'admin' || role === 'superadmin';
+
+      if (!isAllowed) {
         await supabase.auth.signOut();
         setError('Access denied. Admin accounts only.');
         return;
       }
+
       router.push('/admin');
     } catch {
       await supabase.auth.signOut().catch(() => {});

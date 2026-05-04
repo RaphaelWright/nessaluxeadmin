@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getAnalytics } from '../../../lib/admin-data';
 import { Analytics } from '../../../lib/types';
+import { formatCurrency } from '../../../lib/currency';
 
 interface Trends {
   dailyRevenue: Record<string, number>;
@@ -82,7 +83,7 @@ export default function AnalyticsPage() {
             <div className="bg-white rounded-2xl border border-gray-100 p-7">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Total Revenue</p>
               <p className="text-4xl font-bold text-gray-900">
-                ${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                {formatCurrency(totalRevenue)}
               </p>
               <div className="mt-3 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
@@ -149,7 +150,7 @@ export default function AnalyticsPage() {
                     <span className="text-sm text-gray-500">{r._count?.status ?? 0} orders</span>
                   </div>
                   <span className="text-sm font-bold text-gray-900">
-                    ${parseFloat(r._sum?.totalAmount ?? '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    {formatCurrency(r._sum?.totalAmount ?? '0')}
                   </span>
                 </div>
               ))}
@@ -175,7 +176,7 @@ export default function AnalyticsPage() {
                   <div key={date} className="flex-1 group relative">
                     <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-10">
                       <div className="bg-gray-900 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap shadow">
-                        {date}<br />${revenue.toFixed(2)}
+                        {date}<br />{formatCurrency(revenue)}
                       </div>
                     </div>
                     <div
@@ -201,7 +202,7 @@ export default function AnalyticsPage() {
                 {trendEntries.map(([date, revenue]) => (
                   <tr key={date} className="hover:bg-gray-50/60 transition-colors">
                     <td className="px-6 py-3.5 text-sm text-gray-700">{date}</td>
-                    <td className="px-6 py-3.5 text-sm font-semibold text-gray-900">${revenue.toFixed(2)}</td>
+                    <td className="px-6 py-3.5 text-sm font-semibold text-gray-900">{formatCurrency(revenue)}</td>
                     <td className="px-6 py-3.5 text-sm text-gray-500">{trends?.dailyOrders[date] ?? 0}</td>
                   </tr>
                 ))}
