@@ -378,6 +378,19 @@ export async function listUsers(params: {
   };
 }
 
+export async function setUserRole(userId: string, role: 'admin' | 'customer'): Promise<User> {
+  const { data, error } = await supabase
+    .rpc('set_user_role', {
+      target_user_id: userId,
+      new_role: role,
+    })
+    .single();
+
+  if (error) throw error;
+
+  return mapUser(data as ProfileRow);
+}
+
 export async function listOrders(params: {
   page: number;
   limit: number;
