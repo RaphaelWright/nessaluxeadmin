@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { setToken, getToken, apiFetch } from '../../lib/api';
+import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,25 +11,32 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (getToken()) router.replace('/admin');
-  }, [router]);
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    const supabase = createClient();
+
     try {
-      const res = await apiFetch('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Login failed'); return; }
-      if (data.user.role !== 'admin') { setError('Access denied. Admin accounts only.'); return; }
-      setToken(data.token);
+
+      if (authError) {
+        setError(authError.message);
+        return;
+      }
+
+      if (authData.user?.app_metadata?.role !== 'admin') {
+        await supabase.auth.signOut();
+        setError('Access denied. Admin accounts only.');
+        return;
+      }
       router.push('/admin');
     } catch {
+      await supabase.auth.signOut().catch(() => {});
       setError('Network error. Please try again.');
     } finally {
       setLoading(false);

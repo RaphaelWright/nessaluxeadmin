@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { apiFetch } from '../../../lib/api';
+import { useEffect, useState } from 'react';
+import { listUsers } from '../../../lib/admin-data';
 import { User, Pagination } from '../../../lib/types';
 
 function initials(u: User) {
@@ -25,17 +25,30 @@ export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch(`/admin/users?page=${page}&limit=15`);
-      const data = await res.json();
-      setUsers(data.data ?? []);
-      setPagination(data.pagination ?? null);
-    } finally { setLoading(false); }
-  }, [page]);
+  useEffect(() => {
+    let cancelled = false;
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+    async function loadUsers() {
+      setLoading(true);
+      try {
+        const result = await listUsers({ page, limit: 15 });
+        if (!cancelled) {
+          setUsers(result.data);
+          setPagination(result.pagination);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadUsers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [page]);
 
   return (
     <div className="p-8">

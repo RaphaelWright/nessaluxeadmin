@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { apiFetch } from '../../../lib/api';
+import { useEffect, useState } from 'react';
+import { deleteCategory, listCategories, saveCategory } from '../../../lib/admin-data';
 import { Category } from '../../../lib/types';
 
 const EMPTY = { name: '', description: '', imageUrl: '' };
@@ -37,16 +37,28 @@ export default function CategoriesPage() {
 
   const notify = (msg: string, ok = true) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 4000); };
 
-  const fetchCategories = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch('/categories?limit=100');
-      const data = await res.json();
-      setCategories(data.data ?? []);
-    } finally { setLoading(false); }
-  }, []);
+  useEffect(() => {
+    let cancelled = false;
 
-  useEffect(() => { fetchCategories(); }, [fetchCategories]);
+    async function loadCategories() {
+      try {
+        const data = await listCategories();
+        if (!cancelled) {
+          setCategories(data);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadCategories();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const openAdd = () => { setEditingId(null); setForm(EMPTY); setModalOpen(true); };
   const openEdit = (c: Category) => {
@@ -58,21 +70,32 @@ export default function CategoriesPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    const body = { name: form.name, description: form.description || undefined, imageUrl: form.imageUrl || undefined };
-    const res = await apiFetch(
-      editingId ? `/admin/categories/${editingId}` : '/admin/categories',
-      { method: editingId ? 'PUT' : 'POST', body: JSON.stringify(body) }
-    );
-    setSaving(false);
-    if (res.ok) { notify(editingId ? 'Category updated!' : 'Category created!'); setModalOpen(false); fetchCategories(); }
-    else { const err = await res.json(); notify(err.error || 'Failed to save', false); }
+    try {
+      await saveCategory({
+        id: editingId ?? undefined,
+        name: form.name,
+        description: form.description || undefined,
+        imageUrl: form.imageUrl || undefined,
+      });
+      notify(editingId ? 'Category updated!' : 'Category created!');
+      setModalOpen(false);
+      setCategories(await listCategories());
+    } catch {
+      notify('Failed to save', false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this category?')) return;
-    const res = await apiFetch(`/admin/categories/${id}`, { method: 'DELETE' });
-    if (res.ok) { notify('Category deleted!'); fetchCategories(); }
-    else notify('Failed to delete', false);
+    try {
+      await deleteCategory(id);
+      notify('Category deleted!');
+      setCategories(await listCategories());
+    } catch {
+      notify('Failed to delete', false);
+    }
   };
 
   return (

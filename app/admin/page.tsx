@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { apiFetch } from '../../lib/api';
+import { getDashboardStats } from '../../lib/admin-data';
 import { DashboardStats } from '../../lib/types';
 
 const STATUS_STYLES: Record<string, string> = {
@@ -101,11 +101,30 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    apiFetch('/admin/dashboard/stats')
-      .then((r) => r.json())
-      .then(setStats)
-      .catch(() => setError('Failed to load stats'))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+
+    async function loadStats() {
+      try {
+        const data = await getDashboardStats();
+        if (!cancelled) {
+          setStats(data);
+        }
+      } catch {
+        if (!cancelled) {
+          setError('Failed to load stats');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadStats();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const getCardValue = (key: string, prefix?: string) => {
