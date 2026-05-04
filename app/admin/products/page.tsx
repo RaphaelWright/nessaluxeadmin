@@ -8,6 +8,7 @@ import {
   saveProduct,
 } from '../../../lib/admin-data';
 import { Product, Category, Pagination } from '../../../lib/types';
+import { formatCurrency } from '../../../lib/currency';
 
 const EMPTY_FORM = { name: '', description: '', price: '', stock: '', categoryId: '', imageUrl: '' };
 
@@ -261,7 +262,7 @@ export default function ProductsPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm font-semibold text-gray-900">${p.price}</td>
+                  <td className="px-6 py-4 text-sm font-semibold text-gray-900">{formatCurrency(p.price)}</td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium ${p.stock > 10 ? 'bg-emerald-50 text-emerald-700' : p.stock > 0 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600'}`}>
                       {p.stock} units
@@ -317,8 +318,8 @@ export default function ProductsPage() {
                 <div>
                   <label className={labelCls}>Price <span className="text-red-400">*</span></label>
                   <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                    <input type="number" step="0.01" min="0" required value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} className={inputCls + ' pl-7'} placeholder="0.00" />
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">GH₵</span>
+                    <input type="number" step="0.01" min="0" required value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} className={inputCls + ' pl-12'} placeholder="0.00" />
                   </div>
                 </div>
                 <div>
