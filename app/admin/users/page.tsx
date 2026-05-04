@@ -34,6 +34,7 @@ export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const [error, setError] = useState<string>('');
 
@@ -48,6 +49,7 @@ export default function UsersPage() {
 
       if (active) {
         setCurrentUserId(user?.id ?? null);
+        setCurrentUserRole(typeof user?.app_metadata?.role === 'string' ? user.app_metadata.role : null);
       }
     }
 
@@ -89,7 +91,9 @@ export default function UsersPage() {
   }, [page]);
 
   const handleRoleChange = async (user: User, role: 'admin' | 'customer') => {
-    if (user.id === currentUserId || updatingUserId) {
+    const canManageRoles = currentUserRole === 'superadmin';
+
+    if (!canManageRoles || user.id === currentUserId || user.role === 'superadmin' || updatingUserId) {
       return;
     }
 
@@ -116,6 +120,12 @@ export default function UsersPage() {
           {pagination ? `${pagination.total} registered users` : 'View all registered customers'}
         </p>
       </div>
+
+      {currentUserRole !== 'superadmin' && (
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm text-amber-800">
+          Only the superadmin can assign or remove admin roles.
+        </div>
+      )}
 
       {error && (
         <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3.5 text-sm text-red-700">
@@ -176,7 +186,13 @@ export default function UsersPage() {
                   <td className="px-6 py-4 text-sm text-gray-600">{u.email}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">{u.phonenumber ?? <span className="text-gray-300">—</span>}</td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full ring-1 ring-inset capitalize ${u.role === 'admin' ? 'bg-indigo-50 text-indigo-700 ring-indigo-600/20' : 'bg-gray-100 text-gray-600 ring-gray-500/20'}`}>
+                    <span className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full ring-1 ring-inset capitalize ${
+                      u.role === 'superadmin'
+                        ? 'bg-amber-50 text-amber-800 ring-amber-600/20'
+                        : u.role === 'admin'
+                          ? 'bg-indigo-50 text-indigo-700 ring-indigo-600/20'
+                          : 'bg-gray-100 text-gray-600 ring-gray-500/20'
+                    }`}>
                       {u.role}
                     </span>
                   </td>
@@ -184,8 +200,12 @@ export default function UsersPage() {
                     {new Date(u.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </td>
                   <td className="px-6 py-4">
-                    {u.id === currentUserId ? (
+                    {u.role === 'superadmin' ? (
+                      <span className="text-xs font-medium text-amber-700">Protected role</span>
+                    ) : u.id === currentUserId ? (
                       <span className="text-xs font-medium text-gray-400">Current account</span>
+                    ) : currentUserRole !== 'superadmin' ? (
+                      <span className="text-xs font-medium text-gray-400">Superadmin only</span>
                     ) : (
                       <button
                         type="button"
